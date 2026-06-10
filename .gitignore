@@ -1,0 +1,12 @@
+# Environment variables — contains API keys and secrets
+.env
+
+# Google Cloud service account credentials
+*.json
+!email_tracking/host.json
+!email_tracking/local.settings.json
+
+# Python cache
+__pycache__/
+*.pyc
+speakhire-outreach/_data/api

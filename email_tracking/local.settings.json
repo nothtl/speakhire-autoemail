@@ -1,0 +1,9 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "python",
+    "COSMOS_CONNECTION_STRING": "AccountEndpoint=https://localhost:8081;AccountKey=your-key-here;",
+    "TRACKING_API_KEY": "dev-key-change-in-production"
+  }
+}
