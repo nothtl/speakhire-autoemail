@@ -35,33 +35,32 @@ var DEFAULT_SENDER_NAME = "Hana Figueroa from SpeakHire";
 
 // ═══════════════════════════════════════════════════
 // EMAIL SIGNATURE IMAGE
-// Embedded as base64 data URL — no external URLs, no cid, no inlineImages needed
+// Uses cid: inline attachment — the only method Gmail supports
 // ═══════════════════════════════════════════════════
 
 var SIGNATURE_IMAGE_ID = "1B77GL5DCAFMhIuzmsOpQpW2T1ixyLmgs";
-var SIGNATURE_DATA_URL = "";
+var SIGNATURE_BLOB = null;  // cached after first fetch
 
-function buildSignatureDataUrl() {
-  if (SIGNATURE_DATA_URL) return SIGNATURE_DATA_URL;
+function getSignatureBlob() {
+  if (SIGNATURE_BLOB) return SIGNATURE_BLOB;
   try {
     var file = DriveApp.getFileById(SIGNATURE_IMAGE_ID);
     var blob = file.getBlob();
-    var mimeType = blob.getContentType() || "image/png";
-    var base64 = Utilities.base64Encode(blob.getBytes());
-    SIGNATURE_DATA_URL = "data:" + mimeType + ";base64," + base64;
+    blob.setName("signature");  // name becomes the Content-ID reference
+    Logger.log("OK signature: " + file.getName() + " | " + blob.getContentType() + " | " + blob.getBytes().length + " bytes");
+    SIGNATURE_BLOB = blob;
+    return blob;
   } catch (e) {
-    // Image not accessible — skip signature silently
+    Logger.log("FAIL signature: " + e.toString());
+    return null;
   }
-  return SIGNATURE_DATA_URL;
 }
 
 function getSignatureHtml() {
-  var dataUrl = buildSignatureDataUrl();
-  if (!dataUrl) return "";
   return (
     '<br><br>' +
-    '<img src="' + dataUrl + '"' +
-    ' alt="SpeakHire" style="max-width:400px;width:100%;height:auto;border:none;" />'
+    '<img src="cid:signature" alt="SpeakHire"' +
+    ' style="max-width:400px;width:100%;height:auto;border:none;" />'
   );
 }
 
@@ -201,8 +200,8 @@ function sendBatch() {
     Logger.log("WARNING: Video not found. Check SMN_VIDEO_ID and Drive permissions.");
   }
 
-  // Pre-build signature image once (embedded in HTML as data URL)
-  buildSignatureDataUrl();
+  // Fetch signature image blob once
+  var signatureBlob = getSignatureBlob();
 
   for (var i = BATCH_START - 1; i < endRow; i++) {
     var row = data[i];
@@ -270,6 +269,11 @@ function sendBatch() {
         htmlBody: htmlBody,
         name: DEFAULT_SENDER_NAME,
       };
+
+      // Attach signature as inline image (cid:signature)
+      if (signatureBlob) {
+        options.inlineImages = { signature: signatureBlob };
+      }
 
       // Attach Hana's video (fetched once above)
       if (videoAttachment) {

@@ -72,55 +72,46 @@ function getTrackingPixel(email, name, orgName, campaign) {
 }
 
 // ═══════════════════════════════════════════════════
-// EMAIL IMAGES — Embedded as base64 data URLs
-// No external URLs, no cid, no inlineImages needed
+// EMAIL IMAGES — cid: inline attachments (the only method Gmail supports)
 // ═══════════════════════════════════════════════════
 
-var FLYER_DATA_URL = "";
-var SIGNATURE_DATA_URL = "";
+var SIGNATURE_IMAGE_ID = "1B77GL5DCAFMhIuzmsOpQpW2T1ixyLmgs";
+var FLYER_IMAGE_ID = "";  // set to Drive file ID if you have a Summit flyer
+var FLYER_BLOB = null;
+var SIGNATURE_BLOB = null;
 
-function buildDataUrl(fileId) {
+function getImageBlob(fileId, name) {
+  if (!fileId) return null;
   try {
     var file = DriveApp.getFileById(fileId);
     var blob = file.getBlob();
-    var mimeType = blob.getContentType() || "image/png";
-    var base64 = Utilities.base64Encode(blob.getBytes());
-    return "data:" + mimeType + ";base64," + base64;
+    blob.setName(name);
+    Logger.log("OK " + name + ": " + file.getName() + " | " + blob.getContentType() + " | " + blob.getBytes().length + " bytes");
+    return blob;
   } catch (e) {
-    return "";
+    Logger.log("FAIL " + name + ": " + e.toString());
+    return null;
   }
 }
 
-/**
- * Build the HTML body for an email.
- * Images are embedded as base64 data URLs — works in all email clients.
- */
-function buildHtmlBody(plainText, firstName) {
-  // Replace any {{First Name}} placeholders
+function buildHtmlBody(plainText, firstName, hasFlyer, hasSignature) {
   var body = plainText.replace(/\{\{First Name\}\}/g, firstName);
   body = body.replace(/\{\{First Name\}\}/gi, firstName);
 
-  // Convert plain text to basic HTML (line breaks -> <br>)
   var htmlBody = body
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/\n/g, "<br>");
 
-  // Add the flyer image
-  if (FLYER_DATA_URL) {
+  if (hasFlyer) {
     htmlBody +=
-      '<br><br><img src="' + FLYER_DATA_URL + '"' +
-      ' style="max-width:100%;height:auto;display:block;"' +
-      ' alt="SpeakHire Summit flyer">';
+      '<br><br><img src="cid:flyer" style="max-width:100%;height:auto;display:block;" alt="Summit flyer">';
   }
 
-  // Add the email signature image
-  if (SIGNATURE_DATA_URL) {
+  if (hasSignature) {
     htmlBody +=
-      '<br><br><img src="' + SIGNATURE_DATA_URL + '"' +
-      ' style="max-width:400px;width:100%;height:auto;border:none;"' +
-      ' alt="SpeakHire">';
+      '<br><br><img src="cid:signature" style="max-width:400px;width:100%;height:auto;border:none;" alt="SpeakHire">';
   }
 
   return (
@@ -150,9 +141,11 @@ function sendBatch() {
   var errors = 0;
   var endRow = Math.min(BATCH_START + BATCH_SIZE - 1, lastRow);
 
-  // Pre-build image data URLs once
-  FLYER_DATA_URL = buildDataUrl(DRIVE_FILE_ID);
-  SIGNATURE_DATA_URL = buildDataUrl(SIGNATURE_IMAGE_ID);
+  // Fetch image blobs once
+  var flyerBlob = getImageBlob(FLYER_IMAGE_ID, "flyer");
+  var signatureBlob = getImageBlob(SIGNATURE_IMAGE_ID, "signature");
+  var hasFlyer = (flyerBlob !== null);
+  var hasSignature = (signatureBlob !== null);
 
   for (var i = BATCH_START - 1; i < endRow; i++) {
     var row = data[i];
@@ -181,15 +174,23 @@ function sendBatch() {
     }
 
     try {
-      var htmlBody = buildHtmlBody(combined, firstName);
+      var htmlBody = buildHtmlBody(combined, firstName, hasFlyer, hasSignature);
 
       // Append tracking pixel
       htmlBody += getTrackingPixel(email, firstName, "Summit Attendee", CAMPAIGN_SLUG);
 
-      GmailApp.sendEmail(email, subject, combined, {
+      var options = {
         htmlBody: htmlBody,
         name: "Alicia Zhuang from SpeakHire",
-      });
+      };
+      if (hasFlyer) options.inlineImages = options.inlineImages || {};
+      if (hasSignature) {
+        options.inlineImages = options.inlineImages || {};
+        options.inlineImages.signature = signatureBlob;
+      }
+      if (hasFlyer) options.inlineImages.flyer = flyerBlob;
+
+      GmailApp.sendEmail(email, subject, combined, options);
 
       // Mark as sent
       var timestamp = new Date().toLocaleString();

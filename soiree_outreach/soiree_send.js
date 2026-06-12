@@ -21,33 +21,32 @@ var DEFAULT_SENDER_NAME = "Hetal Jani from SpeakHire";
 
 // ═══════════════════════════════════════════════════
 // EMAIL SIGNATURE IMAGE
-// Embedded as base64 data URL — no external URLs, no cid, no inlineImages needed
+// Uses cid: inline attachment — the only method Gmail supports
 // ═══════════════════════════════════════════════════
 
 var SIGNATURE_IMAGE_ID = "1B77GL5DCAFMhIuzmsOpQpW2T1ixyLmgs";
-var SIGNATURE_DATA_URL = "";
+var SIGNATURE_BLOB = null;
 
-function buildSignatureDataUrl() {
-  if (SIGNATURE_DATA_URL) return SIGNATURE_DATA_URL;
+function getSignatureBlob() {
+  if (SIGNATURE_BLOB) return SIGNATURE_BLOB;
   try {
     var file = DriveApp.getFileById(SIGNATURE_IMAGE_ID);
     var blob = file.getBlob();
-    var mimeType = blob.getContentType() || "image/png";
-    var base64 = Utilities.base64Encode(blob.getBytes());
-    SIGNATURE_DATA_URL = "data:" + mimeType + ";base64," + base64;
+    blob.setName("signature");
+    Logger.log("OK signature: " + file.getName() + " | " + blob.getContentType() + " | " + blob.getBytes().length + " bytes");
+    SIGNATURE_BLOB = blob;
+    return blob;
   } catch (e) {
-    // Image not accessible — skip signature silently
+    Logger.log("FAIL signature: " + e.toString());
+    return null;
   }
-  return SIGNATURE_DATA_URL;
 }
 
 function getSignatureHtml() {
-  var dataUrl = buildSignatureDataUrl();
-  if (!dataUrl) return "";
   return (
     '<br><br>' +
-    '<img src="' + dataUrl + '"' +
-    ' alt="SpeakHire" style="max-width:400px;width:100%;height:auto;border:none;" />'
+    '<img src="cid:signature" alt="SpeakHire"' +
+    ' style="max-width:400px;width:100%;height:auto;border:none;" />'
   );
 }
 
@@ -113,8 +112,8 @@ function sendBatch() {
   var sent = 0, skipped = 0, errors = 0;
   var endRow = Math.min(BATCH_START + BATCH_SIZE - 1, lastRow);
 
-  // Pre-build signature image once (embedded in HTML as data URL)
-  buildSignatureDataUrl();
+  // Fetch signature image blob once
+  var signatureBlob = getSignatureBlob();
 
   for (var i = BATCH_START - 1; i < endRow; i++) {
     var row = data[i];
@@ -143,10 +142,14 @@ function sendBatch() {
       htmlBody = '<div style="font-family:Arial,sans-serif;font-size:14px;color:#222;">' +
                  htmlBody + '</div>';
 
-      GmailApp.sendEmail(email, subject, body, {
+      var options = {
         htmlBody: htmlBody,
         name: DEFAULT_SENDER_NAME,
-      });
+      };
+      if (signatureBlob) {
+        options.inlineImages = { signature: signatureBlob };
+      }
+      GmailApp.sendEmail(email, subject, body, options);
       sheet.getRange(i + 1, COL_STATUS).setValue("SENT");
       sheet.getRange(i + 1, COL_SENT_AT).setValue(new Date().toLocaleString());
       sent++;
