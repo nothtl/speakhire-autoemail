@@ -1,6 +1,21 @@
 """
-Summit-specific AI email prompt - Alicia's voice, personalized summit invitations.
+summit_prompt.py — SpeakHire Summit AI prompts (Alicia's voice).
+
+Update speaker bios, date, and venue here when the event changes.
 """
+
+# ═══════════════════════════════════════════════════
+# CAMPAIGN INFO — used by the generator script
+# ═══════════════════════════════════════════════════
+
+CAMPAIGN = {
+    "name": "SpeakHire Summit",
+    "sheet_tab": "Summit Outreach 2026",
+}
+
+# ═══════════════════════════════════════════════════
+# EVENT FACTS + CONTEXT — update speakers/date/venue here
+# ═══════════════════════════════════════════════════
 
 SUMMIT_SYSTEM_PROMPT = """You are Alicia Zhuang from SpeakHire, a NYC-based nonprofit that helps underrepresented immigrant youth access career opportunities, build confidence, and connect with employers.
 
@@ -149,3 +164,12 @@ MULTILINGUAL OPPORTUNITIES:
 - Tech companies hire for localization and international roles
 - Legal and nonprofit organizations need multilingual case workers and advocates
 """
+
+
+# ═══════════════════════════════════════════════════
+# GETTER
+# ═══════════════════════════════════════════════════
+
+def get_prompt():
+    """Return the summit system prompt for Alicia's outreach."""
+    return SUMMIT_SYSTEM_PROMPT

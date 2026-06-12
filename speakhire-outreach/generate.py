@@ -40,7 +40,7 @@ for env_dir in ["speakhire-outreach-simple", "speakhire-outreach-shared", "."]:
 else:
     load_dotenv()
 
-from campaign_prompts import get_prompt, get_sender, CAMPAIGN_TYPES
+from outreach_prompt import get_prompt, get_sender, CAMPAIGN_TYPES
 import outreach_worker as worker
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")

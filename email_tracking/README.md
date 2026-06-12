@@ -2,18 +2,18 @@
 
 Open and click tracking for all SpeakHire outreach emails. Uses Azure Functions + Cosmos DB. Data flows both ways: emails → Azure (tracking), Azure → Google Sheets (sync + dashboard).
 
-## Files — what each one is for
+## Files - what each one is for
 
 | File | What it is | Deploy to |
 |---|---|---|
-| `function_app.py` | Azure Function — all 6 API endpoints | `func azure functionapp publish ...` |
+| `function_app.py` | Azure Function - all 6 API endpoints | `func azure functionapp publish ...` |
 | `requirements.txt` | Python deps for the function | Bundled with function_app.py |
 | `host.json` | Azure Functions runtime settings | Bundled with function_app.py |
 | `local.settings.json` | Template for local dev | Your machine only (not committed) |
 | `sheet_addons.js` | Code to **paste into** each campaign send script | Google Sheets → Extensions → Apps Script |
 | `dashboard.js` | Standalone script for a separate dashboard sheet | A new Google Sheet's Apps Script |
 | `implementation.md` | Architecture deep-dive + Azure concepts | Your brain |
-| `README.md` | This file — quick start | — |
+| `README.md` | This file - quick start | - |
 
 ## Quick start
 
@@ -34,9 +34,9 @@ var TRACKING_BASE_URL = "https://speakhire-tracker.azurewebsites.net";  // ← y
 ```
 
 The send scripts already include:
-- `encodeTrackingId()` + `getTrackingPixel()` — embeds a tracking pixel in every sent email
-- `syncTracking()` — pulls open/click counts back into the campaign sheet
-- `syncDashboard()` — populates a dashboard tab with summary stats
+- `encodeTrackingId()` + `getTrackingPixel()` - embeds a tracking pixel in every sent email
+- `syncTracking()` - pulls open/click counts back into the campaign sheet
+- `syncDashboard()` - populates a dashboard tab with summary stats
 
 Each campaign's menu now has three items:
 
@@ -55,7 +55,7 @@ If you want a separate spreadsheet just for the dashboard:
 3. Update `TRACKING_SYNC_URL` and `TRACKING_API_KEY`
 4. Click **📊 Sync Dashboard**
 
-The dashboard sheet talks only to Azure — it doesn't need access to your campaign sheets.
+The dashboard sheet talks only to Azure - it doesn't need access to your campaign sheets.
 
 ## How it works (30 seconds)
 

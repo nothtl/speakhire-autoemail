@@ -23,6 +23,9 @@ var SHEET_NAME = "Summit Outreach 2026";
 var DRIVE_FILE_ID =
   "https://docs.google.com/spreadsheets/d/1afKWetT_AEwqAS9nYieMfxWjEZk2zf3TQZ0mOWo0qCA/edit?usp=sharing";
 
+// SpeakHire email signature image (Google Drive file ID)
+var SIGNATURE_IMAGE_ID = "1B77GL5DCAFMhIuzmsOpQpW2T1ixyLmgs";
+
 // The exact subject line of your Gmail draft (used to find the draft with inline image)
 var DRAFT_SUBJECT = "SpeakHire Summit Invitation";
 
@@ -67,32 +70,31 @@ function getTrackingPixel(email, name, orgName, campaign) {
     'opacity:0 !important;width:1px !important;height:1px !important;" />';
 }
 
-/**
- * Get or create the inline image as a Blob from Google Drive.
- * The file must be shared as "Anyone with the link".
- */
-function getDriveImage() {
-  if (DRIVE_FILE_ID === "YOUR_DRIVE_FILE_ID_HERE") {
-    return null; // No image configured
-  }
+// ═══════════════════════════════════════════════════
+// EMAIL IMAGES — Embedded as base64 data URLs
+// No external URLs, no cid, no inlineImages needed
+// ═══════════════════════════════════════════════════
+
+var FLYER_DATA_URL = "";
+var SIGNATURE_DATA_URL = "";
+
+function buildDataUrl(fileId) {
   try {
-    var file = DriveApp.getFileById(DRIVE_FILE_ID);
+    var file = DriveApp.getFileById(fileId);
     var blob = file.getBlob();
-    return {
-      name: file.getName(),
-      blob: blob,
-    };
+    var mimeType = blob.getContentType() || "image/png";
+    var base64 = Utilities.base64Encode(blob.getBytes());
+    return "data:" + mimeType + ";base64," + base64;
   } catch (e) {
-    console.warn("Could not fetch Drive image: " + e.toString());
-    return null;
+    return "";
   }
 }
 
 /**
- * Build the HTML body for an email, using a cid: reference for the
- * inline image (so it loads reliably in all email clients).
+ * Build the HTML body for an email.
+ * Images are embedded as base64 data URLs — works in all email clients.
  */
-function buildHtmlBody(plainText, firstName, hasImage) {
+function buildHtmlBody(plainText, firstName) {
   // Replace any {{First Name}} placeholders
   var body = plainText.replace(/\{\{First Name\}\}/g, firstName);
   body = body.replace(/\{\{First Name\}\}/gi, firstName);
@@ -104,12 +106,20 @@ function buildHtmlBody(plainText, firstName, hasImage) {
     .replace(/>/g, "&gt;")
     .replace(/\n/g, "<br>");
 
-  // Add the image at the end via cid: reference (inline attachment)
-  if (hasImage) {
+  // Add the flyer image
+  if (FLYER_DATA_URL) {
     htmlBody +=
-      '<br><br><img src="cid:flyer"' +
+      '<br><br><img src="' + FLYER_DATA_URL + '"' +
       ' style="max-width:100%;height:auto;display:block;"' +
       ' alt="SpeakHire Summit flyer">';
+  }
+
+  // Add the email signature image
+  if (SIGNATURE_DATA_URL) {
+    htmlBody +=
+      '<br><br><img src="' + SIGNATURE_DATA_URL + '"' +
+      ' style="max-width:400px;width:100%;height:auto;border:none;"' +
+      ' alt="SpeakHire">';
   }
 
   return (
@@ -139,9 +149,9 @@ function sendBatch() {
   var errors = 0;
   var endRow = Math.min(BATCH_START + BATCH_SIZE - 1, lastRow);
 
-  // Get the flyer image blob once (shared across all emails)
-  var imageBlob = getDriveImage();
-  var hasImage = (imageBlob !== null);
+  // Pre-build image data URLs once
+  FLYER_DATA_URL = buildDataUrl(DRIVE_FILE_ID);
+  SIGNATURE_DATA_URL = buildDataUrl(SIGNATURE_IMAGE_ID);
 
   for (var i = BATCH_START - 1; i < endRow; i++) {
     var row = data[i];
@@ -170,22 +180,15 @@ function sendBatch() {
     }
 
     try {
-      var htmlBody = buildHtmlBody(combined, firstName, hasImage);
+      var htmlBody = buildHtmlBody(combined, firstName);
 
       // Append tracking pixel
       htmlBody += getTrackingPixel(email, firstName, "Summit Attendee", CAMPAIGN_SLUG);
 
-      var options = {
+      GmailApp.sendEmail(email, subject, combined, {
         htmlBody: htmlBody,
         name: "Alicia Zhuang from SpeakHire",
-      };
-
-      // Attach the flyer as an inline image (cid:flyer)
-      if (hasImage) {
-        options.inlineImages = { flyer: imageBlob.blob };
-      }
-
-      GmailApp.sendEmail(email, subject, combined, options);
+      });
 
       // Mark as sent
       var timestamp = new Date().toLocaleString();

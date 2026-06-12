@@ -34,6 +34,90 @@ var SHEET_NAME  = "#SpeakingMyName Outreach";
 var DEFAULT_SENDER_NAME = "Hana Figueroa from SpeakHire";
 
 // ═══════════════════════════════════════════════════
+// EMAIL SIGNATURE IMAGE
+// Embedded as base64 data URL — no external URLs, no cid, no inlineImages needed
+// ═══════════════════════════════════════════════════
+
+var SIGNATURE_IMAGE_ID = "1B77GL5DCAFMhIuzmsOpQpW2T1ixyLmgs";
+var SIGNATURE_DATA_URL = "";
+
+function buildSignatureDataUrl() {
+  if (SIGNATURE_DATA_URL) return SIGNATURE_DATA_URL;
+  try {
+    var file = DriveApp.getFileById(SIGNATURE_IMAGE_ID);
+    var blob = file.getBlob();
+    var mimeType = blob.getContentType() || "image/png";
+    var base64 = Utilities.base64Encode(blob.getBytes());
+    SIGNATURE_DATA_URL = "data:" + mimeType + ";base64," + base64;
+  } catch (e) {
+    // Image not accessible — skip signature silently
+  }
+  return SIGNATURE_DATA_URL;
+}
+
+function getSignatureHtml() {
+  var dataUrl = buildSignatureDataUrl();
+  if (!dataUrl) return "";
+  return (
+    '<br><br>' +
+    '<img src="' + dataUrl + '"' +
+    ' alt="SpeakHire" style="max-width:400px;width:100%;height:auto;border:none;" />'
+  );
+}
+
+// Hana's #SpeakingMyName video (Google Drive file ID)
+var SMN_VIDEO_ID = "1-PMelNFytCjHZ7VydlJ9O2KnTBsrhN2S";
+var SMN_VIDEO_URL = "https://drive.google.com/file/d/" + SMN_VIDEO_ID + "/view";
+
+/**
+ * Get video as attachment blob if under 25MB, otherwise return null.
+ * Sets the global smnVideoTooLarge flag and Drive link for the note.
+ */
+var smnVideoTooLarge = false;
+var smnVideoDriveLink = "";
+
+function getVideoAttachment() {
+  try {
+    var file = DriveApp.getFileById(SMN_VIDEO_ID);
+    var sizeMB = file.getSize() / (1024 * 1024);
+    Logger.log("Video: " + file.getName() + " (" + sizeMB.toFixed(1) + " MB)");
+
+    if (sizeMB > 25) {
+      // Too large for Gmail attachment — share a link instead
+      smnVideoTooLarge = true;
+      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+      smnVideoDriveLink = file.getUrl();
+      Logger.log("Video too large for attachment. Sharing link: " + smnVideoDriveLink);
+      return null;
+    }
+
+    return file.getBlob();
+  } catch (e) {
+    Logger.log("Could not fetch video: " + e);
+    return null;
+  }
+}
+
+/** Return a note about the video (attached or linked). */
+function getVideoNote() {
+  if (smnVideoTooLarge && smnVideoDriveLink) {
+    return (
+      '<br><p style="font-size:13px;color:#555;">' +
+      'I\'ve also recorded a short #SpeakingMyName video sharing my name, ' +
+      'its pronunciation, and the story behind it. ' +
+      '<a href="' + smnVideoDriveLink + '" style="color:#1a73e8;">Watch it here</a>.' +
+      '</p>'
+    );
+  }
+  return (
+    '<br><p style="font-size:13px;color:#555;">' +
+    'I\'ve also attached a short #SpeakingMyName video ' +
+    'sharing my name, its pronunciation, and the story behind it.' +
+    '</p>'
+  );
+}
+
+// ═══════════════════════════════════════════════════
 // EMAIL TRACKING — Azure Functions (open + click)
 // ═══════════════════════════════════════════════════
 
@@ -108,6 +192,17 @@ function sendBatch() {
   var errors  = 0;
   var endRow  = Math.min(BATCH_START + BATCH_SIZE - 1, lastRow);
 
+  // Fetch video attachment ONCE before the loop
+  var videoAttachment = getVideoAttachment();
+  if (videoAttachment) {
+    Logger.log("Video attached: " + videoAttachment.getName() + " (" + videoAttachment.getBytes().length + " bytes)");
+  } else {
+    Logger.log("WARNING: Video not found. Check SMN_VIDEO_ID and Drive permissions.");
+  }
+
+  // Pre-build signature image once (embedded in HTML as data URL)
+  buildSignatureDataUrl();
+
   for (var i = BATCH_START - 1; i < endRow; i++) {
     var row = data[i];
 
@@ -165,13 +260,22 @@ function sendBatch() {
         .replace(/>/g, "&gt;")
         .replace(/\n/g, "<br>");
       htmlBody += getTrackingPixel(email, fullName, assocName, CAMPAIGN_SLUG);
+      htmlBody += getVideoNote();
+      htmlBody += getSignatureHtml();
       htmlBody = '<div style="font-family:Arial,sans-serif;font-size:14px;color:#222;">' +
                  htmlBody + '</div>';
 
-      GmailApp.sendEmail(email, subject, body, {
+      var options = {
         htmlBody: htmlBody,
         name: DEFAULT_SENDER_NAME,
-      });
+      };
+
+      // Attach Hana's video (fetched once above)
+      if (videoAttachment) {
+        options.attachments = [videoAttachment];
+      }
+
+      GmailApp.sendEmail(email, subject, body, options);
 
       // Mark as sent
       var timestamp = new Date().toLocaleString();
@@ -278,11 +382,22 @@ function previewBatch() {
 // CONVENIENCE FUNCTIONS
 // ═══════════════════════════════════════════════════
 
-/** Send a single test email (row 2 only). Change the row to test a specific org. */
+/** Send a single test email — ONLY row 2. Change BATCH_START to test a different row. */
 function sendTest() {
   BATCH_START = 2;
   BATCH_SIZE  = 1;
-  sendBatch();
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  var rowData = sheet.getRange(BATCH_START, COL_FULL_NAME).getValue();
+  var emailAddr = sheet.getRange(BATCH_START, COL_EMAIL).getValue();
+  var ui = SpreadsheetApp.getUi();
+  var response = ui.alert(
+    "Send test to row " + BATCH_START + "?",
+    "Name: " + rowData + "\nEmail: " + emailAddr + "\n\nOnly this ONE email will be sent.",
+    ui.ButtonSet.OK_CANCEL
+  );
+  if (response === ui.Button.OK) {
+    sendBatch();
+  }
 }
 
 /** Send batch 1: rows 2–51 */

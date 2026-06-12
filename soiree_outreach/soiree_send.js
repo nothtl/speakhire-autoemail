@@ -17,7 +17,39 @@
 var BATCH_START = 2;
 var BATCH_SIZE  = 50;
 var SHEET_NAME  = "Soiree Outreach";
-var DEFAULT_SENDER_NAME = "Hana from SpeakHire";
+var DEFAULT_SENDER_NAME = "Hetal Jani from SpeakHire";
+
+// ═══════════════════════════════════════════════════
+// EMAIL SIGNATURE IMAGE
+// Embedded as base64 data URL — no external URLs, no cid, no inlineImages needed
+// ═══════════════════════════════════════════════════
+
+var SIGNATURE_IMAGE_ID = "1B77GL5DCAFMhIuzmsOpQpW2T1ixyLmgs";
+var SIGNATURE_DATA_URL = "";
+
+function buildSignatureDataUrl() {
+  if (SIGNATURE_DATA_URL) return SIGNATURE_DATA_URL;
+  try {
+    var file = DriveApp.getFileById(SIGNATURE_IMAGE_ID);
+    var blob = file.getBlob();
+    var mimeType = blob.getContentType() || "image/png";
+    var base64 = Utilities.base64Encode(blob.getBytes());
+    SIGNATURE_DATA_URL = "data:" + mimeType + ";base64," + base64;
+  } catch (e) {
+    // Image not accessible — skip signature silently
+  }
+  return SIGNATURE_DATA_URL;
+}
+
+function getSignatureHtml() {
+  var dataUrl = buildSignatureDataUrl();
+  if (!dataUrl) return "";
+  return (
+    '<br><br>' +
+    '<img src="' + dataUrl + '"' +
+    ' alt="SpeakHire" style="max-width:400px;width:100%;height:auto;border:none;" />'
+  );
+}
 
 // ═══════════════════════════════════════════════════
 // EMAIL TRACKING — Azure Functions (open + click)
@@ -80,6 +112,9 @@ function sendBatch() {
   var sent = 0, skipped = 0, errors = 0;
   var endRow = Math.min(BATCH_START + BATCH_SIZE - 1, lastRow);
 
+  // Pre-build signature image once (embedded in HTML as data URL)
+  buildSignatureDataUrl();
+
   for (var i = BATCH_START - 1; i < endRow; i++) {
     var row = data[i];
     var status  = String(row[COL_STATUS - 1]  || "").trim();
@@ -103,6 +138,7 @@ function sendBatch() {
         .replace(/>/g, "&gt;")
         .replace(/\n/g, "<br>");
       htmlBody += getTrackingPixel(email, name, orgName, CAMPAIGN_SLUG);
+      htmlBody += getSignatureHtml();
       htmlBody = '<div style="font-family:Arial,sans-serif;font-size:14px;color:#222;">' +
                  htmlBody + '</div>';
 

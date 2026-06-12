@@ -1,4 +1,4 @@
-# Email Tracking — Code Walkthrough & Maintenance Guide
+# Email Tracking - Code Walkthrough & Maintenance Guide
 
 ## File dependency map
 
@@ -52,7 +52,7 @@ email_tracking/
 
 5. Email client receives the 43-byte GIF
    └── Renders it as an invisible 1×1 pixel
-   └── User sees nothing — just the normal email
+   └── User sees nothing - just the normal email
 
 Total time: ~100ms (warm) to ~5s (cold). The user never notices.
 ```
@@ -78,7 +78,7 @@ Each import serves a specific purpose. `uuid` is used once per event to generate
 ### Module-level initialization (lines 15-30)
 
 ```python
-COSMOS_CONN = os.environ["COSMOS_CONNECTION_STRING"]    # required — crashes on startup if missing
+COSMOS_CONN = os.environ["COSMOS_CONNECTION_STRING"]    # required - crashes on startup if missing
 DATABASE = "tracking"
 CONTAINER = "events"
 
@@ -86,7 +86,7 @@ _client = CosmosClient.from_connection_string(COSMOS_CONN)
 _db = _client.get_database_client(DATABASE)
 _container = _db.get_container_client(CONTAINER)
 
-API_KEY = os.environ.get("TRACKING_API_KEY", "")  # optional — open access if not set
+API_KEY = os.environ.get("TRACKING_API_KEY", "")  # optional - open access if not set
 
 PIXEL = base64.b64decode(
     "R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
@@ -95,7 +95,7 @@ PIXEL = base64.b64decode(
 
 **Why module-level:** In Azure Functions (Python), the module is loaded once and reused across invocations when the function is "warm." Variables defined at module scope persist between requests. This means:
 - The Cosmos DB connection is established once, not per-request (saves ~200ms per request)
-- The 1×1 GIF is decoded once (saves ~0.1ms — but conceptually cleaner)
+- The 1×1 GIF is decoded once (saves ~0.1ms - but conceptually cleaner)
 - On cold start (first request after deploy or idle), everything loads fresh
 
 The `PIXEL` variable is a base64-encoded 1×1 transparent GIF. Decoded, it's exactly 43 bytes. Every email client on the planet renders this correctly.
@@ -108,7 +108,7 @@ The `PIXEL` variable is a base64-encoded 1×1 transparent GIF. Decoded, it's exa
 app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 ```
 
-`ANONYMOUS` means no Azure Function-level auth — anyone can hit these URLs. This is intentional: tracking pixels are loaded by email clients, which can't authenticate. The sensitive endpoints (`/api/analytics`, `/api/sheet`, `/api/dashboard`, `/api/email`) do their own auth via `_check_api_key()`.
+`ANONYMOUS` means no Azure Function-level auth - anyone can hit these URLs. This is intentional: tracking pixels are loaded by email clients, which can't authenticate. The sensitive endpoints (`/api/analytics`, `/api/sheet`, `/api/dashboard`, `/api/email`) do their own auth via `_check_api_key()`.
 
 ### _record_event() (line ~60)
 
@@ -139,7 +139,7 @@ def _record_event(event_type, email_id, req, link_url=None, link_text=None):
 ```
 
 **Line-by-line:**
-- `try/except` wraps the entire function. If Cosmos DB is down, we log a warning and return. The tracking pixel still returns a 200 (the caller doesn't await this). This is the "fire-and-forget" pattern — the pixel response must never fail.
+- `try/except` wraps the entire function. If Cosmos DB is down, we log a warning and return. The tracking pixel still returns a 200 (the caller doesn't await this). This is the "fire-and-forget" pattern - the pixel response must never fail.
 - `_decode_email_id(email_id)` takes the URL path segment (e.g. `eyJlIjoiamFuZUB4...`) and base64-decodes it to `{"e":"jane@x.com","n":"Jane","o":"QC House","c":"speaking_my_name"}`. This is the core design: zero database lookups to know who opened the email.
 - The `id` is globally unique: timestamp + random hex. Cosmos requires a unique `id` within a partition.
 - `partition_key` is `campaign_{slug}`. All events for one campaign share the same partition, making campaign-scoped queries fast and cheap.
@@ -160,10 +160,10 @@ def _decode_email_id(email_id):
 ```
 
 **Line-by-line:**
-- `import json` inside the function — keeps the dependency explicit for this function (json is also imported at module level).
-- `padded = ...` — base64 requires padding to multiples of 4. The JS `encodeTrackingId()` strips `=` signs to make URLs cleaner. This line adds them back before decoding. Example: `"eyJl"` (4 chars, no padding needed) vs `"eyJ"` (3 chars, needs 1 `=` → `"eyJ="`).
-- `base64.urlsafe_b64decode(padded)` — uses URL-safe base64 (`-` instead of `+`, `_` instead of `/`), matching the JS `encodeTrackingId()` transform.
-- `json.loads(decoded)` — parses the JSON string back to a Python dict.
+- `import json` inside the function - keeps the dependency explicit for this function (json is also imported at module level).
+- `padded = ...` - base64 requires padding to multiples of 4. The JS `encodeTrackingId()` strips `=` signs to make URLs cleaner. This line adds them back before decoding. Example: `"eyJl"` (4 chars, no padding needed) vs `"eyJ"` (3 chars, needs 1 `=` → `"eyJ="`).
+- `base64.urlsafe_b64decode(padded)` - uses URL-safe base64 (`-` instead of `+`, `_` instead of `/`), matching the JS `encodeTrackingId()` transform.
+- `json.loads(decoded)` - parses the JSON string back to a Python dict.
 - If anything fails (malformed ID, old encoding format), returns an empty dict. The caller handles missing keys gracefully with `.get()` defaults.
 
 ### _check_api_key() (line ~100)
@@ -197,11 +197,11 @@ def track_open(req):
 ```
 
 **Line-by-line:**
-- `@app.route(route="api/o/{email_id}")` — the `{email_id}` path parameter is extracted by Azure and available via `req.route_params`. The `o` stands for "open" — kept short to minimize URL length in email HTML.
-- `_record_event("open", email_id, req)` — fire-and-forget. We don't `await` or check the result. The pixel response must be fast.
+- `@app.route(route="api/o/{email_id}")` - the `{email_id}` path parameter is extracted by Azure and available via `req.route_params`. The `o` stands for "open" - kept short to minimize URL length in email HTML.
+- `_record_event("open", email_id, req)` - fire-and-forget. We don't `await` or check the result. The pixel response must be fast.
 - The cache headers are critical. `Cache-Control: no-cache, no-store, must-revalidate` tells Gmail's image proxy "do NOT cache this." Gmail prefetches all images through its proxy. Without this header, Gmail loads the pixel once when the email arrives, and subsequent actual opens by the user don't trigger new requests. Every email client that respects `Cache-Control` will re-fetch the pixel on each open.
-- `Pragma: no-cache` — for older HTTP/1.0 clients.
-- `Expires: 0` — for very old clients.
+- `Pragma: no-cache` - for older HTTP/1.0 clients.
+- `Expires: 0` - for very old clients.
 
 ### track_click() (line ~125)
 
@@ -223,15 +223,15 @@ def track_click(req):
 ```
 
 **Line-by-line:**
-- `meta = _decode_email_id(link_id)` — for click IDs, the metadata includes `l` (the real URL) and `t` (link text).
-- `meta.get("l", "https://speakhire.org")` — the real URL to redirect to. Fallback to SpeakHire's homepage if missing.
-- `email_id = meta.get("i", link_id)` — the `i` field cross-references the original tracking info (set to `email|campaign` by `encodeTrackingId()`). This allows the click event to be associated with the right recipient.
+- `meta = _decode_email_id(link_id)` - for click IDs, the metadata includes `l` (the real URL) and `t` (link text).
+- `meta.get("l", "https://speakhire.org")` - the real URL to redirect to. Fallback to SpeakHire's homepage if missing.
+- `email_id = meta.get("i", link_id)` - the `i` field cross-references the original tracking info (set to `email|campaign` by `encodeTrackingId()`). This allows the click event to be associated with the right recipient.
 - The backward-compat block handles old tracking IDs that were created before the `l` field existed. Those old links use `?r=https%3A%2F%2Fspeakhire.org%2Fregister` as a query parameter instead.
 - `302 Found` redirect. Uses 302 (temporary) rather than 301 (permanent) so browsers don't cache the redirect and skip tracking on subsequent clicks.
 
 ### sheet_sync() (line ~265)
 
-The most performance-sensitive endpoint — called by Apps Script for every email in a campaign.
+The most performance-sensitive endpoint - called by Apps Script for every email in a campaign.
 
 ```python
 @app.route(route="api/sheet/{campaign}", methods=["GET"])
@@ -248,7 +248,7 @@ def sheet_sync(req):
     if emails_filter:
         requested = {e.strip().lower() for e in emails_filter.split(",") if e.strip()}
 
-    # Query single partition — no cross-partition scan needed
+    # Query single partition - no cross-partition scan needed
     partition = f"campaign_{campaign}"
     items = _container.query_items(
         query="SELECT * FROM c WHERE c.partition_key = @pk",
@@ -289,7 +289,7 @@ def sheet_sync(req):
 ```
 
 **Design decisions:**
-- **Single partition query.** The query filters on `partition_key = campaign_{slug}`. Cosmos reads only one physical partition — fast and cheap (~3 RU for hundreds of events).
+- **Single partition query.** The query filters on `partition_key = campaign_{slug}`. Cosmos reads only one physical partition - fast and cheap (~3 RU for hundreds of events).
 - **In-memory aggregation.** Rather than doing `GROUP BY` in Cosmos SQL (which is limited and expensive), we stream all events for the campaign and aggregate in Python. For a campaign with 500 events, this takes ~5ms.
 - **Days filter in Python, not SQL.** Cosmos SQL doesn't have great date filtering. We fetch all events in the partition and filter by age in Python.
 - **One API call per campaign, not per email.** Apps Script's `UrlFetchApp` has ~200ms latency per call. If you have 50 emails, 50 calls = 10 seconds. One batched call = 200ms.
@@ -312,9 +312,9 @@ def dashboard(req):
 ```
 
 **Design decisions:**
-- **Cross-partition query** — more expensive (~10-50 RU) but acceptable because it runs on-demand (manual menu click), not per-open.
-- **Unique counts via Python sets** — accumulate `unique_emails` and `orgs` as sets, then call `len()` at the end. Simpler and more reliable than Cosmos `COUNT(DISTINCT)`.
-- **Daily breakdown** — the `daily` dict tracks opens/clicks per date, used by the dashboard for the daily trend table.
+- **Cross-partition query** - more expensive (~10-50 RU) but acceptable because it runs on-demand (manual menu click), not per-open.
+- **Unique counts via Python sets** - accumulate `unique_emails` and `orgs` as sets, then call `len()` at the end. Simpler and more reliable than Cosmos `COUNT(DISTINCT)`.
+- **Daily breakdown** - the `daily` dict tracks opens/clicks per date, used by the dashboard for the daily trend table.
 
 ### analytics() (line ~160)
 
@@ -332,9 +332,9 @@ This file is pasted INTO each campaign send script. It depends on variables from
 |---|---|---|
 | `SHEET_NAME` | Parent script config | Which tab to read/write |
 | `COL_EMAIL` | Parent column mapping | Which column has email addresses |
-| `CAMPAIGN_SLUG` | Tracking config section | e.g. `"speaking_my_name"` — becomes Cosmos partition key |
+| `CAMPAIGN_SLUG` | Tracking config section | e.g. `"speaking_my_name"` - becomes Cosmos partition key |
 
-### encodeTrackingId() — the core logic
+### encodeTrackingId() - the core logic
 
 The JavaScript counterpart to `_decode_email_id()` in Python. They must stay in sync.
 
@@ -357,7 +357,7 @@ function encodeTrackingId(email, name, orgName, campaign, linkUrl, linkText) {
 }
 ```
 
-**Why single-letter field names:** Shorter keys = shorter encoded ID. `{"e":"jane@x.com",...}` encodes smaller than `{"email":"jane@x.com",...}`. This matters because the full URL is embedded in every email — shorter means less risk of Gmail's 102KB clipping threshold.
+**Why single-letter field names:** Shorter keys = shorter encoded ID. `{"e":"jane@x.com",...}` encodes smaller than `{"email":"jane@x.com",...}`. This matters because the full URL is embedded in every email - shorter means less risk of Gmail's 102KB clipping threshold.
 
 **Why URL-safe base64:** Standard base64 uses `+`, `/`, and `=`, which have special meanings in URLs (`+` = space, `/` = path separator, `=` = query param). The transform `.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")` makes it URL-safe.
 
@@ -383,10 +383,10 @@ Called from the campaign menu. Writes per-row open/click counts back to the shee
 
 1. Finds or auto-creates tracking columns (Opens, Clicks, Last Open, Last Click) via `getOrCreateTrackingColumn()`
 2. Collects all email addresses from the sheet into a comma-separated list
-3. Calls `GET /api/sheet/{campaign}?emails=...&api_key=...` — one call for all rows
+3. Calls `GET /api/sheet/{campaign}?emails=...&api_key=...` - one call for all rows
 4. Iterates the response: for each email, writes `opens`, `clicks`, `last_open`, `last_click` to the matching row
 
-**Why auto-create columns:** `getOrCreateTrackingColumn()` scans the header row. If "Opens" doesn't exist, it appends a new column with bold formatting. No manual column setup needed — the first sync creates everything.
+**Why auto-create columns:** `getOrCreateTrackingColumn()` scans the header row. If "Opens" doesn't exist, it appends a new column with bold formatting. No manual column setup needed - the first sync creates everything.
 
 ## How tracking is embedded in every email
 
@@ -414,7 +414,7 @@ GmailApp.sendEmail(email, subject, body, {
 });
 ```
 
-**Both plain text and HTML are sent.** Email clients that prefer plain text get the body without the pixel. Clients that render HTML (Gmail, Outlook, Apple Mail) get the version with the pixel. This is Gmail best practice — always provide both.
+**Both plain text and HTML are sent.** Email clients that prefer plain text get the body without the pixel. Clients that render HTML (Gmail, Outlook, Apple Mail) get the version with the pixel. This is Gmail best practice - always provide both.
 
 ## Maintenance tasks
 
@@ -433,7 +433,7 @@ var CAMPAIGN_SLUG     = "your_new_campaign";
 var campaigns = ["speaking_my_name", "summit", "soiree", "general", "your_new_campaign"];
 ```
 
-The Azure backend needs no changes — it reads the campaign from the tracking ID payload, and Cosmos auto-creates the partition on first write.
+The Azure backend needs no changes - it reads the campaign from the tracking ID payload, and Cosmos auto-creates the partition on first write.
 
 ### How to update the Cosmos DB schema
 
@@ -451,12 +451,12 @@ var payload = {
 ```python
 doc = {
     ...
-    "campaign_version": meta.get("v", "1"),  # NEW — defaults to "1" for old events
+    "campaign_version": meta.get("v", "1"),  # NEW - defaults to "1" for old events
     ...
 }
 ```
 
-Existing events without the `v` field default to `"1"`. No migration needed — Cosmos is schemaless. New events get the new field, old events won't have it, queries handle both.
+Existing events without the `v` field default to `"1"`. No migration needed - Cosmos is schemaless. New events get the new field, old events won't have it, queries handle both.
 
 ### How to rotate the API key
 
@@ -473,7 +473,7 @@ az functionapp config appsettings set \
 # 3. Update TRACKING_API_KEY in every JS script
 ```
 
-Azure restarts the function on setting change — the old key stops working immediately.
+Azure restarts the function on setting change - the old key stops working immediately.
 
 ### How to delete old events
 
@@ -491,7 +491,7 @@ Portal → Cost Management → Cost analysis → filter by resource group `speak
 
 1. `TRACKING_SYNC_URL` must be exactly `https://speakhire-tracker.azurewebsites.net` (no trailing slash)
 2. Test the URL in a browser: `https://speakhire-tracker.azurewebsites.net/api/dashboard?api_key=KEY`
-3. If browser works but Apps Script doesn't, check API key encoding — special characters need `encodeURIComponent()`
+3. If browser works but Apps Script doesn't, check API key encoding - special characters need `encodeURIComponent()`
 
 ### Tracking pixel not recording
 
@@ -506,7 +506,7 @@ Gmail prefetches images via its proxy (`googleusercontent.com` User-Agent). The 
 
 ### Cold start latency
 
-First request after deploy or idle takes 2-5 seconds on the Consumption plan. The pixel still loads (the GIF is 43 bytes and returns instantly). Only the Cosmos write has latency, and it's fire-and-forget — the user never notices.
+First request after deploy or idle takes 2-5 seconds on the Consumption plan. The pixel still loads (the GIF is 43 bytes and returns instantly). Only the Cosmos write has latency, and it's fire-and-forget - the user never notices.
 
 ## Testing locally
 
@@ -525,9 +525,9 @@ curl "http://localhost:7071/api/sheet/speaking_my_name?emails=jane@x.com"
 Full pipeline test:
 1. Deploy to a staging Function App
 2. Update `TRACKING_BASE_URL` in one campaign
-3. `sendTest()` — 1 email to yourself
+3. `sendTest()` - 1 email to yourself
 4. Open it, wait 30 seconds
-5. `syncTracking()` — should see "Opens: 1"
+5. `syncTracking()` - should see "Opens: 1"
 
 ## Deploying updates
 
