@@ -106,12 +106,12 @@ function buildHtmlBody(plainText, firstName, hasFlyer, hasSignature) {
 
   if (hasFlyer) {
     htmlBody +=
-      '<br><br><img src="cid:flyer" style="max-width:100%;height:auto;display:block;" alt="Summit flyer">';
+      '<br><br><img src="flyer" style="max-width:100%;height:auto;display:block;" alt="Summit flyer">';
   }
 
   if (hasSignature) {
     htmlBody +=
-      '<br><br><img src="cid:signature" style="max-width:400px;width:100%;height:auto;border:none;" alt="SpeakHire">';
+      '<br><br><img src="signature" style="max-width:400px;width:100%;height:auto;border:none;" alt="SpeakHire">';
   }
 
   return (

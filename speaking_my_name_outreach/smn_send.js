@@ -45,9 +45,11 @@ function getSignatureBlob() {
   if (SIGNATURE_BLOB) return SIGNATURE_BLOB;
   try {
     var file = DriveApp.getFileById(SIGNATURE_IMAGE_ID);
-    var blob = file.getBlob();
-    blob.setName("signature");  // name becomes the Content-ID reference
-    Logger.log("OK signature: " + file.getName() + " | " + blob.getContentType() + " | " + blob.getBytes().length + " bytes");
+    var bytes = file.getBlob().getBytes();
+    var mime = file.getMimeType() || "image/jpeg";
+    // Build a fresh blob with explicit MIME type — the documented pattern
+    var blob = Utilities.newBlob(bytes, mime, "signature");
+    Logger.log("OK signature: " + file.getName() + " | " + mime + " | " + bytes.length + " bytes");
     SIGNATURE_BLOB = blob;
     return blob;
   } catch (e) {
@@ -57,9 +59,10 @@ function getSignatureBlob() {
 }
 
 function getSignatureHtml() {
+  // GmailApp inlineImages uses the key directly, not "cid:" prefix
   return (
     '<br><br>' +
-    '<img src="cid:signature" alt="SpeakHire"' +
+    '<img src="signature" alt="SpeakHire"' +
     ' style="max-width:400px;width:100%;height:auto;border:none;" />'
   );
 }
@@ -270,7 +273,7 @@ function sendBatch() {
         name: DEFAULT_SENDER_NAME,
       };
 
-      // Attach signature as inline image (cid:signature)
+      // Attach signature as inline image
       if (signatureBlob) {
         options.inlineImages = { signature: signatureBlob };
       }

@@ -45,7 +45,7 @@ function getSignatureBlob() {
 function getSignatureHtml() {
   return (
     '<br><br>' +
-    '<img src="cid:signature" alt="SpeakHire"' +
+    '<img src="signature" alt="SpeakHire"' +
     ' style="max-width:400px;width:100%;height:auto;border:none;" />'
   );
 }
