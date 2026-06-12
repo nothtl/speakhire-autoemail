@@ -34,6 +34,7 @@ var DEFAULT_SENDER_NAME = "Hana from SpeakHire";
 // ═══════════════════════════════════════════════════
 
 var TRACKING_BASE_URL = "https://YOUR_FUNCTION.azurewebsites.net";
+var TRACKING_API_KEY  = "your-secret-key";        // same as Azure TRACKING_API_KEY
 var CAMPAIGN_SLUG     = "general";
 
 function encodeTrackingId(email, name, orgName, campaign, linkUrl, linkText) {

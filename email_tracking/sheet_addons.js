@@ -5,9 +5,12 @@
  * the onOpen function). It adds a "Sync Tracking" menu item and writes
  * open/click counts to new columns in the sheet.
  *
- * CHANGE THIS to your deployed Azure Function URL:
+ * REQUIRES these variables from the parent send script:
+ *   TRACKING_BASE_URL — your Azure Function URL
+ *   CAMPAIGN_SLUG     — e.g. "soiree", "speaking_my_name", "summit"
+ *
+ * CHANGE THIS to your Azure API key:
  */
-var TRACKING_SYNC_URL = "https://YOUR_FUNCTION.azurewebsites.net";
 var TRACKING_API_KEY = "your-secret-key";  // same as TRACKING_API_KEY in Azure
 
 // Columns where opens/clicks will be written.
@@ -59,7 +62,7 @@ function syncTracking() {
   }
 
   // --- Call Azure ---
-  var url = TRACKING_SYNC_URL + "/api/sheet/" + CAMPAIGN_SLUG +
+  var url = TRACKING_BASE_URL + "/api/sheet/" + CAMPAIGN_SLUG +
             "?api_key=" + encodeURIComponent(TRACKING_API_KEY) +
             "&emails=" + encodeURIComponent(emails.join(","));
 
@@ -201,7 +204,7 @@ function syncDashboard() {
   }
 
   // --- Fetch from Azure ---
-  var url = TRACKING_SYNC_URL + "/api/dashboard?api_key=" +
+  var url = TRACKING_BASE_URL + "/api/dashboard?api_key=" +
             encodeURIComponent(TRACKING_API_KEY);
 
   var response;

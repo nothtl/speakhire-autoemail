@@ -122,6 +122,7 @@ function getVideoNote() {
 // ═══════════════════════════════════════════════════
 
 var TRACKING_BASE_URL = "https://YOUR_FUNCTION.azurewebsites.net";
+var TRACKING_API_KEY  = "your-secret-key";        // same as Azure TRACKING_API_KEY
 var CAMPAIGN_SLUG     = "speaking_my_name";
 
 /**
